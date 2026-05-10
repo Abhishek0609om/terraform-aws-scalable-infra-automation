@@ -8,6 +8,10 @@ on:
 jobs:
   terraform:
     runs-on: ubuntu-latest
+    # THIS LINE IS THE FIX:
+    defaults:
+      run:
+        working-directory: ./my-terraform-project
 
     steps:
       - name: Checkout Code
@@ -28,10 +32,6 @@ jobs:
 
       - name: Terraform Validate
         run: terraform validate
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ap-south-1
 
       - name: Terraform Plan
         run: terraform plan
@@ -41,7 +41,9 @@ jobs:
           AWS_REGION: ap-south-1
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        # ONLY UNCOMMENT THIS IF YOU ARE READY TO PAY FOR AWS RESOURCES
+        # run: terraform apply -auto-approve
+        run: echo "Skipping apply for now to save costs" 
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
