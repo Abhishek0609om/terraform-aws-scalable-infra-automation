@@ -234,6 +234,7 @@ resource "aws_launch_template" "lt" {
               # 1. Install necessary software
               yum update -y
               yum install docker amazon-cloudwatch-agent -y
+              yum install aws-cli -y
 
               # 2. Create CloudWatch Agent config FIRST
               # We do this early so we can monitor the startup process
@@ -278,11 +279,19 @@ resource "aws_launch_template" "lt" {
               # 4. Start & enable Docker
               systemctl start docker
               systemctl enable docker
-
+              
               # 5. Deploy the Application
-              docker pull orionson/my-app:latest
+              # Login to ECR 
+              aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 095055159123.dkr.ecr.ap-south-1.amazonaws.com
+             
+              # pull image from ECR 
+              docker pull 095055159123.dkr.ecr.ap-south-1.amazonaws.com/producation-app:latest
+
+              # Remove old container if exists
               docker rm -f my-app || true
-              docker run -d -p 80:3000 --name my-app orionson/my-app:latest
+             
+              # Run Conainer 
+              docker run -d -p 80:3000 --name my-app 095055159123.dkr.ecr.ap-south-1.amazonaws.com/producation-app:latest
               EOF
   )
 
@@ -385,9 +394,16 @@ resource "aws_iam_role" "ec2_cloudwatch_role" {
   })
 }
 
+# Permission 1: Allow EC2 to send logs to CloudWatch
 resource "aws_iam_role_policy_attachment" "cloudwatch_agent_policy" {
   role       = aws_iam_role.ec2_cloudwatch_role.name
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+# Permission 2: Allow EC2 to pull your Docker image from ECR
+resource "aws_iam_role_policy_attachment" "ecr_readonly" {
+  role       = aws_iam_role.ec2_cloudwatch_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
 resource "aws_iam_instance_profile" "ec2_profile" {
@@ -398,4 +414,20 @@ resource "aws_iam_instance_profile" "ec2_profile" {
 resource "aws_cloudwatch_log_group" "system_logs" {
   name              = "ec2-system-logs"
   retention_in_days = 3
+}
+
+# section 11
+# aws ecr 
+resource "aws_ecr_repository" "producation_app_repo" {
+  name = "producation-app"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  image_tag_mutability = "MUTABLE"
+
+  tags = {
+    Name = "producation-app-repo"
+  }
 }
