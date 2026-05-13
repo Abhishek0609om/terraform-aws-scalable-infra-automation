@@ -48,3 +48,54 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ap-south-1
+      
+      # 8. Configure AWS Credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      # 9. Login to Amazon ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 10. Build Docker Image
+      - name: Build Docker Image
+        run: |
+          docker build -t producation-app:latest ../production-app
+
+      # 11. Tag Docker Image
+      - name: Tag Docker Image
+        run: |
+          docker tag producation-app:latest 095055159123.dkr.ecr.ap-south-1.amazonaws.com/producation-app:latest
+
+      # 12. Push Docker Image to ECR
+      - name: Push Docker Image to ECR
+        run: |
+          docker push 095055159123.dkr.ecr.ap-south-1.amazonaws.com/producation-app:latest
+
+      # 13. Copy Kubernetes YAML Files to EC2
+      - name: Copy Kubernetes Files to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "k8s/*"
+          target: "~/"
+
+      # 14. Deploy Application to Kubernetes
+      - name: Deploy to Kubernetes
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            sudo kubectl apply -f ~/k8s/deployment.yaml
+            sudo kubectl apply -f ~/k8s/service.yaml
+            sudo kubectl rollout restart deployment production-app
+            sudo kubectl get pods
