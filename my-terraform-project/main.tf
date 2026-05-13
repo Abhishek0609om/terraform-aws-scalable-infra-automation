@@ -145,6 +145,15 @@ resource "aws_security_group" "ec2_sg" {
     security_groups = [aws_security_group.alb_sg.id]
   }
 
+  # Kubernetes Management traffic coming from your Laptop/GitHub Actions
+  ingress {
+    description = "Kubernetes API Server access"
+    from_port   = 6443
+    to_port     = 6443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Allows deployment commands to reach K3s
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -236,6 +245,18 @@ resource "aws_launch_template" "lt" {
               yum install docker amazon-cloudwatch-agent -y
               yum install aws-cli -y
 
+              # section 13 kubernetes
+              # . Allocate 2GB Virtual Swap Space on Disk to prevent 1GB RAM Instance Crashes
+              fallocate -l 2G /swapfile
+              chmod 600 /swapfile
+              mkswap /swapfile
+              swapon /swapfile
+              echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
+              # 3. Install Lightweight Kubernetes (K3s)
+              curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik --write-kubeconfig-mode 644" sh -
+
+
               # 2. Create CloudWatch Agent config FIRST
               # We do this early so we can monitor the startup process
               cat << 'CWCONFIG' > /opt/aws/amazon-cloudwatch-agent/bin/config.json
@@ -274,7 +295,8 @@ resource "aws_launch_template" "lt" {
 
               # 3. Start CloudWatch Agent
               /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
-              -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json
+              -a fetch-config -m ec2 -s \
+              -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json
 
               # 4. Start & enable Docker
               systemctl start docker
@@ -282,16 +304,18 @@ resource "aws_launch_template" "lt" {
               
               # 5. Deploy the Application
               # Login to ECR 
-              aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 095055159123.dkr.ecr.ap-south-1.amazonaws.com
+              # aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 095055159123.dkr.ecr.ap-south-1.amazonaws.com
              
               # pull image from ECR 
-              docker pull 095055159123.dkr.ecr.ap-south-1.amazonaws.com/producation-app:latest
+              # docker pull 095055159123.dkr.ecr.ap-south-1.amazonaws.com/producation-app:latest
 
               # Remove old container if exists
-              docker rm -f my-app || true
+              # docker rm -f my-app || true
              
-              # Run Conainer 
-              docker run -d -p 80:3000 --name my-app 095055159123.dkr.ecr.ap-south-1.amazonaws.com/producation-app:latest
+              # Run application Conainer 
+              # docker run -d -p 80:3000 --name my-app \
+              # 095055159123.dkr.ecr.ap-south-1.amazonaws.com/producation-app:latest
+
               EOF
   )
 
@@ -306,9 +330,9 @@ resource "aws_launch_template" "lt" {
 # section 8
 # ASG creation 
 resource "aws_autoscaling_group" "aws_asg" {
-  desired_capacity = 0
-  max_size         = 0
-  min_size         = 0
+  desired_capacity = 2
+  max_size         = 3
+  min_size         = 1
 
   vpc_zone_identifier = [
     aws_subnet.public_subnet.id,
@@ -336,9 +360,15 @@ resource "aws_autoscaling_group" "aws_asg" {
   }
 }
 
+# section 14 output
 output "app_url" {
   value       = "http://${aws_lb.alb.dns_name}"
   description = "Copy and paste this into your browser to see your app"
+}
+
+output "asg_name" {
+  value       = aws_autoscaling_group.aws_asg.name
+  description = "The name of the running Auto Scaling Group"
 }
 
 # section 9
@@ -404,6 +434,12 @@ resource "aws_iam_role_policy_attachment" "cloudwatch_agent_policy" {
 resource "aws_iam_role_policy_attachment" "ecr_readonly" {
   role       = aws_iam_role.ec2_cloudwatch_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+# Permission 3: ALLow to SSM 
+resource "aws_iam_role_policy_attachment" "ssm" {
+  role       = aws_iam_role.ec2_cloudwatch_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 resource "aws_iam_instance_profile" "ec2_profile" {
