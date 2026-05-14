@@ -82,12 +82,12 @@ jobs:
         run: |
           # 1. Dynamically locate the live EC2 Instance ID using its Terraform Tag name
           INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=my-app-instance" \
+            --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=my-asg-instance" \
             --query "Reservations[*].Instances[*].InstanceId" \
             --output text)
           
           if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
-            echo "Error: No running EC2 instances found matching tag Name=my-app-instance."
+            echo "Error: No running EC2 instances found matching tag Name=my-asg-instance."
             exit 1
           fi
           echo "Found running production instance target: $INSTANCE_ID"
