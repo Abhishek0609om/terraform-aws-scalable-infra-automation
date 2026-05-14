@@ -8,10 +8,6 @@ on:
 jobs:
   terraform:
     runs-on: ubuntu-latest
-    # THIS LINE IS THE FIX:
-    defaults:
-      run:
-        working-directory: ./my-terraform-project
 
     steps:
       - name: Checkout Code
@@ -22,9 +18,11 @@ jobs:
 
       - name: Terraform Format Check
         run: terraform fmt -check
+        working-directory: ./my-terraform-project
 
       - name: Terraform Init
         run: terraform init
+        working-directory: ./my-terraform-project
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -32,18 +30,20 @@ jobs:
 
       - name: Terraform Validate
         run: terraform validate
+        working-directory: ./my-terraform-project
 
       - name: Terraform Plan
         run: terraform plan
+        working-directory: ./my-terraform-project
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ap-south-1
 
       - name: Terraform Apply
-        # ONLY UNCOMMENT THIS IF YOU ARE READY TO PAY FOR AWS RESOURCES
-        # run: terraform apply -auto-approve
-        run: echo "Skipping apply for now to save costs" 
+        # Change this to 'terraform apply -auto-approve' when you are ready to launch your AWS infrastructure
+        run: echo "Skipping apply for now to save costs"
+        working-directory: ./my-terraform-project
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -62,10 +62,10 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 10. Build Docker Image
+      # 10. Build Docker Image (Executed from Project Root Context)
       - name: Build Docker Image
         run: |
-          docker build -t producation-app:latest ../production-app
+          docker build -t producation-app:latest .
 
       # 11. Tag Docker Image
       - name: Tag Docker Image
@@ -77,25 +77,36 @@ jobs:
         run: |
           docker push 095055159123.dkr.ecr.ap-south-1.amazonaws.com/producation-app:latest
 
-      # 13. Copy Kubernetes YAML Files to EC2
-      - name: Copy Kubernetes Files to EC2
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "k8s/*"
-          target: "~/"
+      # 13. Dynamic IP Discovery & GitOps Deployment via AWS SSM
+      - name: Discover Instance and Deploy to K3s
+        run: |
+          # 1. Dynamically locate the live EC2 Instance ID using its Terraform Tag name
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=instance-state-name,Values=running" "Name=tag:Name,Values=my-app-instance" \
+            --query "Reservations[*].Instances[*].InstanceId" \
+            --output text)
+          
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "Error: No running EC2 instances found matching the specified tags."
+            exit 1
+          fi
+          echo "Found running production instance target: $INSTANCE_ID"
 
-      # 14. Deploy Application to Kubernetes
-      - name: Deploy to Kubernetes
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            sudo kubectl apply -f ~/k8s/deployment.yaml
-            sudo kubectl apply -f ~/k8s/service.yaml
-            sudo kubectl rollout restart deployment production-app
-            sudo kubectl get pods
+          # 2. Convert your local manifest files into text variables
+          DEPLOY_MANIFEST=$(cat k8s/deployment.yaml)
+          SERVICE_MANIFEST=$(cat k8s/service.yaml)
+
+          # 3. Securely push manifests and deploy applications hands-free via the Systems Manager API
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Automated production deployment of QuizApp to K3s cluster" \
+            --parameters "commands=[
+              'mkdir -p ~/k8s',
+              'echo \"$DEPLOY_MANIFEST\" > ~/k8s/deployment.yaml',
+              'echo \"$SERVICE_MANIFEST\" > ~/k8s/service.yaml',
+              'sudo kubectl apply -f ~/k8s/deployment.yaml',
+              'sudo kubectl apply -f ~/k8s/service.yaml',
+              'sudo kubectl rollout restart deployment quiz-app-deployment',
+              'sudo kubectl get pods'
+            ]"
