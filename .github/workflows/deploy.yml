@@ -65,7 +65,7 @@ jobs:
       # 10. Build Docker Image (Executed from Project Root Context)
       - name: Build Docker Image
         run: |
-          docker build -t producation-app:latest .
+          docker build -t producation-app:latest ./production-app
 
       # 11. Tag Docker Image
       - name: Tag Docker Image
@@ -86,27 +86,27 @@ jobs:
             --query "Reservations[*].Instances[*].InstanceId" \
             --output text)
           
-          if [ -z "$INSTANCE_ID" ]; then
-            echo "Error: No running EC2 instances found matching the specified tags."
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "Error: No running EC2 instances found matching tag Name=my-app-instance."
             exit 1
           fi
           echo "Found running production instance target: $INSTANCE_ID"
 
-          # 2. Convert your local manifest files into text variables
-          DEPLOY_MANIFEST=$(cat k8s/deployment.yaml)
-          SERVICE_MANIFEST=$(cat k8s/service.yaml)
+          # 2. Convert manifests into safe, escape-proof strings
+          DEPLOY_MANIFEST=$(cat k8s/deployment.yaml | sed 's/"/\\"/g')
+          SERVICE_MANIFEST=$(cat k8s/service.yaml | sed 's/"/\\"/g')
 
           # 3. Securely push manifests and deploy applications hands-free via the Systems Manager API
           aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --comment "Automated production deployment of QuizApp to K3s cluster" \
-            --parameters "commands=[
-              'mkdir -p ~/k8s',
-              'echo \"$DEPLOY_MANIFEST\" > ~/k8s/deployment.yaml',
-              'echo \"$SERVICE_MANIFEST\" > ~/k8s/service.yaml',
-              'sudo kubectl apply -f ~/k8s/deployment.yaml',
-              'sudo kubectl apply -f ~/k8s/service.yaml',
-              'sudo kubectl rollout restart deployment quiz-app-deployment',
-              'sudo kubectl get pods'
-            ]"
+            --parameters '{"commands":[
+              "mkdir -p /home/ubuntu/k8s",
+              "cat << \x27EOF\x27 > /home/ubuntu/k8s/deployment.yaml\n'"$DEPLOY_MANIFEST"'\nEOF",
+              "cat << \x27EOF\x27 > /home/ubuntu/k8s/service.yaml\n'"$SERVICE_MANIFEST"'\nEOF",
+              "sudo kubectl apply -f /home/ubuntu/k8s/deployment.yaml",
+              "sudo kubectl apply -f /home/ubuntu/k8s/service.yaml",
+              "sudo kubectl rollout restart deployment quiz-app-deployment || true",
+              "sudo kubectl get pods"
+            ]}'
