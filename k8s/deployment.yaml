@@ -24,5 +24,6 @@ spec:
       containers:
         - name: production-app
           image: 095055159123.dkr.ecr.ap-south-1.amazonaws.com/producation-app:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 3000
