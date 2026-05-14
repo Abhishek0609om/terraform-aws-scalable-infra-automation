@@ -77,7 +77,7 @@ jobs:
         run: |
           docker push 095055159123.dkr.ecr.ap-south-1.amazonaws.com/producation-app:latest
 
-  # 13. Dynamic IP Discovery & GitOps Deployment via AWS SSM
+      # 13. Dynamic IP Discovery & GitOps Deployment via AWS SSM
       - name: Discover Instance and Deploy to K3s
         run: |
           # 1. Dynamically locate live EC2 Instance IDs and format them as a space-separated list
@@ -92,21 +92,32 @@ jobs:
           fi
           echo "Found running production instance targets: $INSTANCE_IDS"
 
-          # 2. Convert manifests into completely safe, single-line Base64 strings
-          DEPLOY_BASE64=$(cat k8s/deployment.yaml | base64 -w 0)
-          SERVICE_BASE64=$(cat k8s/service.yaml | base64 -w 0)
+          # 2. Export manifests as environment variables to keep the JSON parameters completely clean
+          export DEPLOY_BASE64=$(cat k8s/deployment.yaml | base64 -w 0)
+          export SERVICE_BASE64=$(cat k8s/service.yaml | base64 -w 0)
 
-          # 3. Securely push manifests and deploy applications hands-free via the Systems Manager API
+          # 3. Create a valid, clean JSON file for parameters to prevent escaping issues
+          cat <<EOF > ssm_params.json
+          {
+            "commands": [
+              "mkdir -p /home/ubuntu/k8s",
+              "echo '${DEPLOY_BASE64}' | base64 -d > /home/ubuntu/k8s/deployment.yaml",
+              "echo '${SERVICE_BASE64}' | base64 -d > /home/ubuntu/k8s/service.yaml",
+              "TOKEN=\$(aws ecr get-login-password --region ap-south-1)",
+              "sudo kubectl delete secret aws-ecr-secret --ignore-not-found",
+              "sudo kubectl create secret docker-registry aws-ecr-secret --docker-server=095055159123.dkr.ecr.ap-south-1.amazonaws.com --docker-username=AWS --docker-password=\$TOKEN",
+              "sudo kubectl apply -f /home/ubuntu/k8s/deployment.yaml",
+              "sudo kubectl apply -f /home/ubuntu/k8s/service.yaml",
+              "sudo kubectl rollout restart deployment production-app || true",
+              "sleep 5",
+              "sudo kubectl get pods"
+            ]
+          }
+          EOF
+
+          # 4. Execute the command securely by passing the clean parameters file
           aws ssm send-command \
             --instance-ids $INSTANCE_IDS \
             --document-name "AWS-RunShellScript" \
             --comment "Automated production deployment of QuizApp to K3s cluster" \
-            --parameters "{\"commands\":[
-              \"mkdir -p /home/ubuntu/k8s\",
-              \"echo '$DEPLOY_BASE64' | base64 -d > /home/ubuntu/k8s/deployment.yaml\",
-              \"echo '$SERVICE_BASE64' | base64 -d > /home/ubuntu/k8s/service.yaml\",
-              \"sudo kubectl apply -f /home/ubuntu/k8s/deployment.yaml\",
-              \"sudo kubectl apply -f /home/ubuntu/k8s/service.yaml\",
-              \"sudo kubectl rollout restart deployment production-app || true\",
-              \"sudo kubectl get pods\"
-            ]}"
+            --parameters file://ssm_params.json

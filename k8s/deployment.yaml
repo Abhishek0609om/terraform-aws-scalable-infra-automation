@@ -17,10 +17,12 @@ spec:
         app: production-app
 
     spec:
+      # This secret block allows Kubernetes to authenticate with your private AWS ECR locker
+      imagePullSecrets:
+        - name: aws-ecr-secret
+
       containers:
         - name: production-app
-
           image: 095055159123.dkr.ecr.ap-south-1.amazonaws.com/producation-app:latest
-
           ports:
             - containerPort: 3000
