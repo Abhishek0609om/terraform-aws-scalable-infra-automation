@@ -101,16 +101,18 @@ jobs:
           cat <<EOF > ssm_params.json
           {
             "commands": [
-              "mkdir -p /home/ubuntu/k8s",
-              "echo '${DEPLOY_BASE64}' | base64 -d > /home/ubuntu/k8s/deployment.yaml",
-              "echo '${SERVICE_BASE64}' | base64 -d > /home/ubuntu/k8s/service.yaml",
-              "echo  '${GRAFANA_BASE64}' | base64 -d > /home/ubuntu/k8s/grafana.yaml",
-              "TOKEN=\$(aws ecr get-login-password --region ap-south-1)",
+              "mkdir -p /home/ec2-user/k8s",
+              "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml",
+              "export PATH=$PATH:/usr/local/bin",
+              "echo '${DEPLOY_BASE64}' | base64 -d > /home/ec2-user/k8s/deployment.yaml",
+              "echo '${SERVICE_BASE64}' | base64 -d > /home/ec2-user/k8s/service.yaml",
+              "echo '${GRAFANA_BASE64}' | base64 -d > /home/ec2-user/k8s/grafana.yaml",
+              "TOKEN=$(aws ecr get-login-password --region ap-south-1)",
               "sudo kubectl delete secret aws-ecr-secret --ignore-not-found",
-              "sudo kubectl create secret docker-registry aws-ecr-secret --docker-server=095055159123.dkr.ecr.ap-south-1.amazonaws.com --docker-username=AWS --docker-password=\$TOKEN",
-              "sudo kubectl apply -f /home/ubuntu/k8s/deployment.yaml",
-              "sudo kubectl apply -f /home/ubuntu/k8s/service.yaml",
-              "sudo kubectl apply -f /home/ubuntu/k8s/grafana.yaml",
+              "sudo kubectl create secret docker-registry aws-ecr-secret --docker-server=095055159123.dkr.ecr.ap-south-1.amazonaws.com --docker-username=AWS --docker-password=$TOKEN",
+              "sudo kubectl apply -f /home/ec2-user/k8s/deployment.yaml",
+              "sudo kubectl apply -f /home/ec2-user/k8s/service.yaml",
+              "sudo kubectl apply -f /home/ec2-user/k8s/grafana.yaml",
               "sudo kubectl rollout restart deployment production-app || true",
               "sleep 5",
               "sudo kubectl get pods"
