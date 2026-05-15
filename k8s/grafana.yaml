@@ -25,6 +25,8 @@ spec:
       labels:
         app: grafana
     spec:
+      securityContext:
+        fsGroup: 472 # Gives ownership of the storage volume to the Grafana user
       containers:
         - name: grafana
           image: grafana/grafana-oss:latest
