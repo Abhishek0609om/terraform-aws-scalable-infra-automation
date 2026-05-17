@@ -352,7 +352,7 @@ resource "aws_autoscaling_group" "aws_asg" {
   instance_refresh {
     strategy = "Rolling"
   }
-
+# top right 
   tag {
     key                 = "Name"
     value               = "my-asg-instance"
