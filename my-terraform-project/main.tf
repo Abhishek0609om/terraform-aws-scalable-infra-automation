@@ -318,7 +318,7 @@ resource "aws_launch_template" "lt" {
 
               EOF
   )
-
+  # git push need 
   tag_specifications {
     resource_type = "instance"
     tags = {
