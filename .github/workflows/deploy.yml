@@ -108,12 +108,16 @@ jobs:
               "echo '${SERVICE_BASE64}' | base64 -d > /home/ec2-user/k8s/service.yaml",
 
               "sudo kubectl delete secret aws-ecr-secret --ignore-not-found", 
-              "aws ecr get-login-password --region ap-south-1 | sudo kubectl create secret docker-registry aws-ecr-secret --docker-server=095055159123.dkr.ecr.ap-south-1.amazonaws.com --docker-username=AWS --docker-password-stdin",
+
+
+              "sudo kubectl create secret docker-registry aws-ecr-secret --docker-server=095055159123.dkr.ecr.ap-south-1.amazonaws.com --docker-username=AWS --docker-password=$(aws ecr get-login-password --region ap-south-1)",
               
               "sudo kubectl apply -f /home/ec2-user/k8s/deployment.yaml",
               "sudo kubectl apply -f /home/ec2-user/k8s/service.yaml",
+
               "sudo kubectl rollout restart deployment production-app || true",
-              "sleep 10",
+              "sleep 20",
+              "sudo kubectl get secrets",
               "sudo kubectl get pods"
             ]
           }
