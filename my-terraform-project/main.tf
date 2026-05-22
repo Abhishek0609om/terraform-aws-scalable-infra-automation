@@ -400,7 +400,7 @@ resource "aws_cloudwatch_metric_alarm" "high_aws" {
     AutoScalingGroup = aws_autoscaling_group.aws_asg.name
 
   }
-# git second point 
+
   alarm_description = "This alarm monitors EC2 CPU usa"
 
   alarm_actions = [aws_sns_topic.alerts.arn]
@@ -473,3 +473,5 @@ resource "aws_ecr_repository" "producation_app_repo" {
     Name = "producation-app-repo"
   }
 }
+
+# lookin 
