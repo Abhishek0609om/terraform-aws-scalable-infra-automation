@@ -111,7 +111,7 @@ jobs:
               "sudo kubectl create secret docker-registry aws-ecr-secret --docker-server=095055159123.dkr.ecr.ap-south-1.amazonaws.com --docker-username=AWS --docker-password=$TOKEN",
               "sudo kubectl apply -f /home/ec2-user/k8s/deployment.yaml",
               "sudo kubectl apply -f /home/ec2-user/k8s/service.yaml",
-              "sudo kubectl delete pod --all --grace-period=0 --force"
+              "sudo kubectl delete pod --all --grace-period=0 --force",
               "sudo kubectl rollout restart deployment production-app || true",
               "sleep 5",
               "sudo kubectl get pods"
