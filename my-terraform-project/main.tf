@@ -343,7 +343,7 @@ resource "aws_autoscaling_group" "aws_asg" {
     id      = aws_launch_template.lt.id
     version = "$Latest"
   }
-
+  # change for git 
   target_group_arns = [aws_lb_target_group.tg.arn]
 
   health_check_type         = "ELB"
