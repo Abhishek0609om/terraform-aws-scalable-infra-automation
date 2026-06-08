@@ -470,6 +470,7 @@ resource "aws_cloudwatch_log_group" "system_logs" {
 # aws ecr 
 resource "aws_ecr_repository" "producation_app_repo" {
   name = "producation-app"
+  force_delete = true # ADD THIS LINE 
 
   image_scanning_configuration {
     scan_on_push = true
