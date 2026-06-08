@@ -8,22 +8,43 @@ A cloud-native production deployment platform built using Terraform, AWS, Docker
 
 # Table of Contents
 
-- Overview
-- Problem Statement
-- Solution
-- Architecture
-- Technology Stack
-- Project Workflow
-- Infrastructure Components
-- CI/CD Pipeline
-- Challenges Solved
-- Results
-- Project Structure
-- Deployment Steps
-- Future Improvements
-
----
-
+- [Production Cloud Platform](#production-cloud-platform)
+- [Table of Contents](#table-of-contents)
+- [Overview](#overview)
+- [Problem Statement](#problem-statement)
+- [Solution](#solution)
+- [Architecture](#architecture)
+- [Technology Stack](#technology-stack)
+- [Project Workflow](#project-workflow)
+  - [1. Infrastructure Provisioning](#1-infrastructure-provisioning)
+  - [2. Application Build](#2-application-build)
+  - [3. Deployment](#3-deployment)
+- [Infrastructure Components](#infrastructure-components)
+  - [AWS VPC](#aws-vpc)
+    - [Components](#components)
+  - [EC2 Instance](#ec2-instance)
+  - [Amazon ECR](#amazon-ecr)
+  - [AWS Systems Manager](#aws-systems-manager)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [Challenges Solved](#challenges-solved)
+  - [Challenge 1: Kubernetes Image Pull Failure](#challenge-1-kubernetes-image-pull-failure)
+    - [Problem](#problem)
+    - [Root Cause](#root-cause)
+    - [Solution](#solution-1)
+  - [Challenge 2: Dynamic Infrastructure](#challenge-2-dynamic-infrastructure)
+    - [Problem](#problem-1)
+    - [Solution](#solution-2)
+  - [Challenge 3: Secure Deployment](#challenge-3-secure-deployment)
+    - [Problem](#problem-2)
+    - [Solution](#solution-3)
+  - [Challenge 4: Automated Kubernetes Updates](#challenge-4-automated-kubernetes-updates)
+    - [Problem](#problem-3)
+    - [Solution](#solution-4)
+- [Results](#results)
+- [Project Structure](#project-structure)
+- [Deployment Steps](#deployment-steps)
+- [Future Improvements](#future-improvements)
+- [Author](#author)
 # Overview
 
 This project demonstrates a complete DevOps deployment pipeline that automatically builds, stores, and deploys containerized applications on AWS.
